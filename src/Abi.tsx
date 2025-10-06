@@ -347,7 +347,7 @@ export default function AbiDynamicUI() {
           
           const events = (window.ethereum as { _events?: Record<string, unknown[]> })._events;
           // @ts-ignore
-          const hasListeners = events?.accountsChanged?.length > 0;
+          const hasListeners = typeof events?.accountsChanged === 'function';
           
           if (!hasListeners) {
             console.warn('⚠️ 检测到监听器丢失，重新注册...');
