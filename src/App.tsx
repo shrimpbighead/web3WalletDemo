@@ -1,4 +1,4 @@
-import Abi from "./abi";
+import Abi from "./Abi";
 
 function App() {
   return (
