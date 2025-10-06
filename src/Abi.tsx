@@ -353,7 +353,7 @@ export default function AbiDynamicUI() {
             console.warn('⚠️ 检测到监听器丢失，重新注册...');
             registerListeners();
           }
-        }, 2000);
+        }, 5000);
       }
       
       // 初始获取账户
