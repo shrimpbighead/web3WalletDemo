@@ -289,38 +289,96 @@ export default function AbiDynamicUI() {
     }
   }, []); // 空依赖数组，因为所有的 setState 函数都是稳定的
 
-  // 初始化 window.ethereum 事件监听器
+  // 初始化 window.ethereum 事件监听器 - 使用持久化策略
   useEffect(() => {
     console.log('🎯 [新版] 正在注册 MetaMask 事件监听器...');
     
-    if (!window.ethereum) {
-      console.log('❌ window.ethereum 不存在');
-      return;
-    }
+    let handlers: { accountsHandler: (...args: unknown[]) => void; chainHandler: (...args: unknown[]) => void } | null = null;
+    let checkInterval: NodeJS.Timeout | null = null;
     
-    console.log('📍 window.ethereum 存在:', typeof window.ethereum);
+    // 使用箭头函数包装，避免闭包问题
+    const accountsHandler = (...args: unknown[]) => {
+      console.log('🔔🔔🔔 accountsChanged 触发！！！', args);
+      handleAccountsChanged(...args);
+    };
+    
+    const chainHandler = (...args: unknown[]) => {
+      console.log('🔔 chainChanged 触发！chainId:', args);
+      handleChainChanged(...args);
+    };
+    
+    // 注册监听器的函数
+    const registerListeners = () => {
+      if (!window.ethereum) {
+        console.log('❌ window.ethereum 不存在');
+        return false;
+      }
       
-    // 直接注册到 window.ethereum
-    console.log('📌 注册监听器...');
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-    window.ethereum.on('chainChanged', handleChainChanged);
-    console.log('✅ 监听器注册完成！');
-    // @ts-ignore
-    window.ethereum.request({ method: "eth_accounts" }).then((accounts: string[]) => {
-      if (accounts.length > 0) setAccount(accounts[0]);
-    });
-    // 验证注册（类型断言）
-    console.log('🔍 验证: window.ethereum._events =', (window.ethereum as { _events?: unknown })._events);
+      // 检查是否已经注册（避免重复注册）
+      const events = (window.ethereum as { _events?: Record<string, unknown[]> })._events;
+      // @ts-ignore
+      const hasAccountsListener = events?.accountsChanged?.length > 0;
+      
+      if (hasAccountsListener) {
+        console.log('✓ 监听器已存在，跳过注册');
+        return true;
+      }
+      
+      console.log('📌 注册监听器...');
+      window.ethereum.on('accountsChanged', accountsHandler);
+      window.ethereum.on('chainChanged', chainHandler);
+      console.log('✅ 监听器注册完成！');
+      
+      // 验证注册
+      const newEvents = (window.ethereum as { _events?: unknown })._events;
+      console.log('🔍 验证: window.ethereum._events =', newEvents);
+      
+      return true;
+    };
+    
+    // 初始注册
+    const timer = setTimeout(() => {
+      if (registerListeners()) {
+        handlers = { accountsHandler, chainHandler };
+        
+        // 每 2 秒检查一次监听器是否还在
+        checkInterval = setInterval(() => {
+          if (!window.ethereum) return;
+          
+          const events = (window.ethereum as { _events?: Record<string, unknown[]> })._events;
+          // @ts-ignore
+          const hasListeners = events?.accountsChanged?.length > 0;
+          
+          if (!hasListeners) {
+            console.warn('⚠️ 检测到监听器丢失，重新注册...');
+            registerListeners();
+          }
+        }, 2000);
+      }
+      
+      // 初始获取账户
+      if (window.ethereum) {
+        window.ethereum.request({ method: "eth_accounts" })
+        // @ts-ignore
+        .then((accounts: string[]) => {
+            if (accounts.length > 0) setAccount(accounts[0]);
+          })
+          .catch(err => console.error('获取账户失败:', err));
+      }
+    }, 100);
     
     // 清理函数
     return () => {
-      console.log('🧹 移除监听器');
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      console.log('🧹 清理监听器和定时器');
+      clearTimeout(timer);
+      if (checkInterval) clearInterval(checkInterval);
+      
+      if (window.ethereum && handlers) {
+        window.ethereum.removeListener('accountsChanged', handlers.accountsHandler);
+        window.ethereum.removeListener('chainChanged', handlers.chainHandler);
       }
     };
-  }, [handleAccountsChanged, handleChainChanged]); // 依赖于 useCallback 包裹的处理器
+  }, []); // 空依赖数组，只在挂载时执行一次
 
   // 重新连接钱包（页面刷新后恢复）
   async function reconnectWallet() {
