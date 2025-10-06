@@ -692,23 +692,6 @@ export default function AbiDynamicUI() {
       />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
-        {/* 头部区域 */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl shadow-2xl p-8 mb-8 relative overflow-hidden">
-          <div className="absolute inset-0 bg-black opacity-5"></div>
-          <div className="relative z-10">
-            <div className="flex items-center gap-4 mb-3">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-4xl shadow-lg">
-                ⚡
-              </div>
-              <div>
-                <h1 className="text-4xl md:text-5xl font-black text-white mb-1 drop-shadow-lg">
-                  ABI 动态前端生成器
-                </h1>
-                <p className="text-blue-100 text-lg font-medium">智能合约交互界面 · 一键生成 · 快速调用</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* 钱包连接区域 */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 mb-8 border border-white/60">
