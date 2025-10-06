@@ -210,19 +210,21 @@ export default function AbiDynamicUI() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 初始化 window.ethereum 事件 - 全局挂载，不受 React 影响
+  // 初始化 window.ethereum 事件 - 使用 useRef 避免闭包问题
   useEffect(() => {
-    console.log('🎯 [全局挂载版] 正在注册 MetaMask 事件监听器...');
+    console.log('🎯 [新版] 正在注册 MetaMask 事件监听器...');
     
     if (!window.ethereum) {
       console.log('❌ window.ethereum 不存在');
       return;
     }
     
-    // 定义全局处理器（挂载到 window，不受打包影响）
-    (window as { __accountsChangedHandler?: (...args: unknown[]) => void }).__accountsChangedHandler = (...args: unknown[]) => {
+    console.log('📍 window.ethereum 存在:', typeof window.ethereum);
+    
+    // 账户切换处理器 - 直接使用函数声明，避免闭包
+    function handleAccountsChanged(...args: unknown[]) {
       const accounts = args[0] as string[];
-      console.log('🔔🔔🔔 [全局] accountsChanged 触发！！！', accounts);
+      console.log('🔔🔔🔔 accountsChanged 触发！！！', accounts);
       console.log('账户数量:', accounts.length);
       console.log('第一个账户:', accounts[0]);
       
@@ -231,7 +233,8 @@ export default function AbiDynamicUI() {
       if (newAccount) {
         console.log('🔄 开始处理账户切换到:', newAccount);
         
-        (async () => {
+        // 异步处理
+        setTimeout(async () => {
           try {
             if (!window.ethereum) return;
             
@@ -261,7 +264,7 @@ export default function AbiDynamicUI() {
             console.error('❌ 账户切换失败:', error);
             toast.error('账户切换失败');
           }
-        })();
+        }, 100);
       } else {
         console.log('⚠️ 账户断开');
         setProvider(null);
@@ -271,17 +274,19 @@ export default function AbiDynamicUI() {
         localStorage.clear();
         toast.error('账户已断开');
       }
-    };
+    }
     
-    (window as { __chainChangedHandler?: (...args: unknown[]) => void }).__chainChangedHandler = (...args: unknown[]) => {
+    // 链切换处理器
+    function handleChainChanged(...args: unknown[]) {
       const chainId = args[0] as string;
-      console.log('🔔 [全局] chainChanged 触发！chainId:', chainId);
+      console.log('🔔 chainChanged 触发！chainId:', chainId);
       setChainId(chainId);
       localStorage.setItem('wallet_chainId', chainId);
       toast.success(`已切换到链 ${chainId}`, { duration: 2000 });
       
+      // 重新获取 signer
       if (window.ethereum) {
-        (async () => {
+        setTimeout(async () => {
           try {
             const web3Provider = new BrowserProvider(window.ethereum!);
             const s = await web3Provider.getSigner();
@@ -291,30 +296,25 @@ export default function AbiDynamicUI() {
           } catch (err) {
             console.error('❌ 更新 provider 失败:', err);
           }
-        })();
+        }, 100);
       }
-    };
+    }
     
-    const accountsHandler = (window as { __accountsChangedHandler?: (...args: unknown[]) => void }).__accountsChangedHandler!;
-    const chainHandler = (window as { __chainChangedHandler?: (...args: unknown[]) => void }).__chainChangedHandler!;
+    // 直接注册到 window.ethereum
+    console.log('📌 注册监听器...');
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+    console.log('✅ 监听器注册完成！');
     
-    console.log('📌 注册全局监听器...');
-    console.log('📍 accountsHandler:', typeof accountsHandler);
-    console.log('📍 chainHandler:', typeof chainHandler);
+    // 验证注册（类型断言）
+    console.log('🔍 验证: window.ethereum._events =', (window.ethereum as { _events?: unknown })._events);
     
-    window.ethereum.on('accountsChanged', accountsHandler);
-    window.ethereum.on('chainChanged', chainHandler);
-    
-    console.log('✅ 全局监听器注册完成！');
-    console.log('🔍 验证: window.__accountsChangedHandler =', typeof accountsHandler);
-    
-    // 清理函数 - 只移除监听器，不删除全局函数
+    // 清理函数
     return () => {
-      console.log('🧹 移除全局监听器');
-      if (window.ethereum && accountsHandler && chainHandler) {
-        window.ethereum.removeListener('accountsChanged', accountsHandler);
-        window.ethereum.removeListener('chainChanged', chainHandler);
-        console.log('🧹 清理完成');
+      console.log('🧹 移除监听器');
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
     };
   }, []);
