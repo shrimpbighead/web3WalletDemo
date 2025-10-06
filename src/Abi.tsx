@@ -210,52 +210,113 @@ export default function AbiDynamicUI() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 初始化 window.ethereum 事件
+  // 初始化 window.ethereum 事件 - 使用 useRef 避免闭包问题
   useEffect(() => {
-    if (window.ethereum) {
-      const eth = window.ethereum;
-      const handleAccounts = (accounts: unknown) => {
-        const accountsArray = accounts as string[];
-        const newAccount = accountsArray?.[0] ?? null;
-        setAccount(newAccount);
-        if (newAccount) {
-          localStorage.setItem('wallet_account', newAccount);
-        } else {
-          localStorage.removeItem('wallet_account');
-          localStorage.removeItem('wallet_chainId');
-          toast.error('账户已断开');
-        }
-      };
-      const handleChain = (chainId: unknown) => {
-        const newChainId = chainId as string;
-        setChainId(newChainId);
+    console.log('🎯 [新版] 正在注册 MetaMask 事件监听器...');
+    
+    if (!window.ethereum) {
+      console.log('❌ window.ethereum 不存在');
+      return;
+    }
+    
+    console.log('📍 window.ethereum 存在:', typeof window.ethereum);
+    
+    // 账户切换处理器 - 直接使用函数声明，避免闭包
+    function handleAccountsChanged(...args: unknown[]) {
+      const accounts = args[0] as string[];
+      console.log('🔔🔔🔔 accountsChanged 触发！！！', accounts);
+      console.log('账户数量:', accounts.length);
+      console.log('第一个账户:', accounts[0]);
+      
+      const newAccount = accounts[0] ?? null;
+      
+      if (newAccount) {
+        console.log('🔄 开始处理账户切换到:', newAccount);
         
-        // 链切换时需要重新创建 provider 和 signer
-        if (window.ethereum && account) {
-          console.log('🔄 检测到链切换，重新初始化 provider...');
-          const web3Provider = new BrowserProvider(window.ethereum);
-          web3Provider.getSigner().then(s => {
+        // 异步处理
+        setTimeout(async () => {
+          try {
+            if (!window.ethereum) return;
+            
+            const web3Provider = new BrowserProvider(window.ethereum);
+            const s = await web3Provider.getSigner();
+            const addr = await s.getAddress();
+            
+            console.log('✅ 新 signer 地址:', addr);
+            
+            setProvider(web3Provider);
+            setSigner(s);
+            setAccount(addr);
+            
+            const network = await web3Provider.getNetwork();
+            const hexChainId = `0x${network.chainId.toString(16)}`;
+            setChainId(hexChainId);
+            
+            localStorage.setItem('wallet_account', addr);
+            localStorage.setItem('wallet_chainId', hexChainId);
+            
+            toast.success(`已切换到 ${addr.slice(0, 6)}...${addr.slice(-4)}`, {
+              icon: '🔄',
+              duration: 3000
+            });
+            console.log('✅ 账户切换完成！');
+          } catch (error) {
+            console.error('❌ 账户切换失败:', error);
+            toast.error('账户切换失败');
+          }
+        }, 100);
+      } else {
+        console.log('⚠️ 账户断开');
+        setProvider(null);
+        setSigner(null);
+        setAccount(null);
+        setChainId(null);
+        localStorage.clear();
+        toast.error('账户已断开');
+      }
+    }
+    
+    // 链切换处理器
+    function handleChainChanged(...args: unknown[]) {
+      const chainId = args[0] as string;
+      console.log('🔔 chainChanged 触发！chainId:', chainId);
+      setChainId(chainId);
+      localStorage.setItem('wallet_chainId', chainId);
+      toast.success(`已切换到链 ${chainId}`, { duration: 2000 });
+      
+      // 重新获取 signer
+      if (window.ethereum) {
+        setTimeout(async () => {
+          try {
+            const web3Provider = new BrowserProvider(window.ethereum!);
+            const s = await web3Provider.getSigner();
             setProvider(web3Provider);
             setSigner(s);
             console.log('✅ Provider 已更新');
-          }).catch(err => {
+          } catch (err) {
             console.error('❌ 更新 provider 失败:', err);
-          });
-        }
-        
-        if (newChainId) {
-          localStorage.setItem('wallet_chainId', newChainId);
-          toast.success(`已切换到链 ${newChainId}`, { duration: 2000 });
-        }
-      };
-      eth.on("accountsChanged", handleAccounts);
-      eth.on("chainChanged", handleChain);
-      return () => {
-        eth.removeListener("accountsChanged", handleAccounts);
-        eth.removeListener("chainChanged", handleChain);
-      };
+          }
+        }, 100);
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
+    // 直接注册到 window.ethereum
+    console.log('📌 注册监听器...');
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+    console.log('✅ 监听器注册完成！');
+    
+    // 验证注册（类型断言）
+    console.log('🔍 验证: window.ethereum._events =', (window.ethereum as { _events?: unknown })._events);
+    
+    // 清理函数
+    return () => {
+      console.log('🧹 移除监听器');
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
+    };
   }, []);
 
   // 重新连接钱包（页面刷新后恢复）
@@ -337,7 +398,9 @@ export default function AbiDynamicUI() {
         throw new Error("未检测到 MetaMask 或兼容钱包");
       }
       const web3Provider = new BrowserProvider(window.ethereum);
-      await web3Provider.send("eth_requestAccounts", []);
+      const accounts = await web3Provider.send("eth_requestAccounts", []);
+      await window.ethereum.request({ method: "eth_accounts"});
+      console.log('📋 获取到的账号列表:', accounts);
       const s = await web3Provider.getSigner();
       const addr = await s.getAddress();
       setProvider(web3Provider);
@@ -490,11 +553,32 @@ export default function AbiDynamicUI() {
   }
 
   // 从 paramsState 取值并尝试转换到合适类型
-  function parseParamValue(type: string, raw: string): string | boolean {
+  function parseParamValue(type: string, raw: string, paramName?: string): string | boolean {
     // 这里只支持基本类型，数组/struct 未支持
     if (type.startsWith("uint") || type.startsWith("int")) {
       // 支持十进制数字输入
       if (raw.trim() === "") throw new Error("空值");
+      
+      // 检查是否是 amount/value 类型的参数，如果是则自动乘以 decimals
+      const isAmountParam = paramName && (
+        paramName.toLowerCase().includes('amount') ||
+        paramName.toLowerCase().includes('value') ||
+        paramName.toLowerCase() === 'wad' ||
+        paramName.toLowerCase().includes('qty') ||
+        paramName.toLowerCase().includes('quantity')
+      );
+      
+      if (isAmountParam) {
+        // 如果输入包含小数点，说明是人类可读格式，需要转换
+        if (raw.includes('.') || (parseFloat(raw) < 1000000 && parseFloat(raw) > 0)) {
+          const decimals = contractAddress.toLowerCase() === "0xdac17f958d2ee523a2206206994597c13d831ec7" ? 6 : 18;
+          const numValue = parseFloat(raw);
+          const bigIntValue = BigInt(Math.floor(numValue * Math.pow(10, decimals)));
+          console.log(`💰 ${paramName} 智能转换: ${raw} → ${bigIntValue.toString()} (decimals: ${decimals})`);
+          return bigIntValue.toString();
+        }
+      }
+      
       // 使用 BigNumber 也可以，但 ethers 自动处理数字字符串
       return raw;
     }
@@ -532,7 +616,7 @@ export default function AbiDynamicUI() {
       const args = inputs.map((input, idx) => {
         const key = `${fnKey}#${idx}`;
         const raw = paramsState[key] ?? "";
-        return parseParamValue(input.type, raw);
+        return parseParamValue(input.type, raw, input.name);
       });
 
       const contract = new Contract(contractAddress, abi, isReadOnly ? currentProvider : currentSigner);
@@ -778,6 +862,7 @@ export default function AbiDynamicUI() {
                     const sampleAbi = getSampleAbi();
                     setAbiText(JSON.stringify(sampleAbi, null, 2));
                     setContractAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789");
+                    switchChain(CHAIN_MAP.sepolia);
                     
                     // 自动填充 balanceOf 参数
                     setTimeout(() => {
@@ -803,14 +888,13 @@ export default function AbiDynamicUI() {
                     const usdtAbi = getUsdtMainnetAbi();
                     setAbiText(JSON.stringify(usdtAbi, null, 2));
                     setContractAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7");
-                    
+                    switchChain(CHAIN_MAP.ethereum);
                     // 自动填充 balanceOf 参数 - Vitalik 的地址
                     setTimeout(() => {
                       setParamsState({
                         'balanceOf(address)#0': '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'
                       });
                     }, 100);
-                    
                     toast.success('已插入 USDT 主网合约示例（Vitalik 地址）', { 
                       icon: '💵',
                       duration: 3000 
