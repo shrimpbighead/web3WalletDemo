@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { BrowserProvider, Contract, type Signer } from "ethers";
 import toast, { Toaster } from "react-hot-toast";
 // 单文件 React 组件 (TypeScript)
@@ -210,7 +210,86 @@ export default function AbiDynamicUI() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 初始化 window.ethereum 事件 - 使用 useRef 避免闭包问题
+  // 账户切换处理器 - 使用 useCallback 避免闭包问题
+  const handleAccountsChanged = useCallback((...args: unknown[]) => {
+    const accounts = args[0] as string[];
+    console.log('🔔🔔🔔 accountsChanged 触发！！！', accounts);
+    console.log('账户数量:', accounts.length);
+    console.log('第一个账户:', accounts[0]);
+    
+    const newAccount = accounts[0] ?? null;
+    
+    if (newAccount) {
+      console.log('🔄 开始处理账户切换到:', newAccount);
+      
+      // 异步处理
+      setTimeout(async () => {
+        try {
+          if (!window.ethereum) return;
+          
+          const web3Provider = new BrowserProvider(window.ethereum);
+          const s = await web3Provider.getSigner();
+          const addr = await s.getAddress();
+          
+          console.log('✅ 新 signer 地址:', addr);
+          
+          setProvider(web3Provider);
+          setSigner(s);
+          setAccount(addr);
+          
+          const network = await web3Provider.getNetwork();
+          const hexChainId = `0x${network.chainId.toString(16)}`;
+          setChainId(hexChainId);
+          
+          localStorage.setItem('wallet_account', addr);
+          localStorage.setItem('wallet_chainId', hexChainId);
+          
+          toast.success(`已切换到 ${addr.slice(0, 6)}...${addr.slice(-4)}`, {
+            icon: '🔄',
+            duration: 3000
+          });
+          console.log('✅ 账户切换完成！');
+        } catch (error) {
+          console.error('❌ 账户切换失败:', error);
+          toast.error('账户切换失败');
+        }
+      }, 100);
+    } else {
+      console.log('⚠️ 账户断开');
+      setProvider(null);
+      setSigner(null);
+      setAccount(null);
+      setChainId(null);
+      localStorage.clear();
+      toast.error('账户已断开');
+    }
+  }, []); // 空依赖数组，因为所有的 setState 函数都是稳定的
+  
+  // 链切换处理器 - 使用 useCallback 避免闭包问题
+  const handleChainChanged = useCallback((...args: unknown[]) => {
+    const chainId = args[0] as string;
+    console.log('🔔 chainChanged 触发！chainId:', chainId);
+    setChainId(chainId);
+    localStorage.setItem('wallet_chainId', chainId);
+    toast.success(`已切换到链 ${chainId}`, { duration: 2000 });
+    
+    // 重新获取 signer
+    if (window.ethereum) {
+      setTimeout(async () => {
+        try {
+          const web3Provider = new BrowserProvider(window.ethereum!);
+          const s = await web3Provider.getSigner();
+          setProvider(web3Provider);
+          setSigner(s);
+          console.log('✅ Provider 已更新');
+        } catch (err) {
+          console.error('❌ 更新 provider 失败:', err);
+        }
+      }, 100);
+    }
+  }, []); // 空依赖数组，因为所有的 setState 函数都是稳定的
+
+  // 初始化 window.ethereum 事件监听器
   useEffect(() => {
     console.log('🎯 [新版] 正在注册 MetaMask 事件监听器...');
     
@@ -220,92 +299,16 @@ export default function AbiDynamicUI() {
     }
     
     console.log('📍 window.ethereum 存在:', typeof window.ethereum);
-    
-    // 账户切换处理器 - 直接使用函数声明，避免闭包
-    function handleAccountsChanged(...args: unknown[]) {
-      const accounts = args[0] as string[];
-      console.log('🔔🔔🔔 accountsChanged 触发！！！', accounts);
-      console.log('账户数量:', accounts.length);
-      console.log('第一个账户:', accounts[0]);
       
-      const newAccount = accounts[0] ?? null;
-      
-      if (newAccount) {
-        console.log('🔄 开始处理账户切换到:', newAccount);
-        
-        // 异步处理
-        setTimeout(async () => {
-          try {
-            if (!window.ethereum) return;
-            
-            const web3Provider = new BrowserProvider(window.ethereum);
-            const s = await web3Provider.getSigner();
-            const addr = await s.getAddress();
-            
-            console.log('✅ 新 signer 地址:', addr);
-            
-            setProvider(web3Provider);
-            setSigner(s);
-            setAccount(addr);
-            
-            const network = await web3Provider.getNetwork();
-            const hexChainId = `0x${network.chainId.toString(16)}`;
-            setChainId(hexChainId);
-            
-            localStorage.setItem('wallet_account', addr);
-            localStorage.setItem('wallet_chainId', hexChainId);
-            
-            toast.success(`已切换到 ${addr.slice(0, 6)}...${addr.slice(-4)}`, {
-              icon: '🔄',
-              duration: 3000
-            });
-            console.log('✅ 账户切换完成！');
-          } catch (error) {
-            console.error('❌ 账户切换失败:', error);
-            toast.error('账户切换失败');
-          }
-        }, 100);
-      } else {
-        console.log('⚠️ 账户断开');
-        setProvider(null);
-        setSigner(null);
-        setAccount(null);
-        setChainId(null);
-        localStorage.clear();
-        toast.error('账户已断开');
-      }
-    }
-    
-    // 链切换处理器
-    function handleChainChanged(...args: unknown[]) {
-      const chainId = args[0] as string;
-      console.log('🔔 chainChanged 触发！chainId:', chainId);
-      setChainId(chainId);
-      localStorage.setItem('wallet_chainId', chainId);
-      toast.success(`已切换到链 ${chainId}`, { duration: 2000 });
-      
-      // 重新获取 signer
-      if (window.ethereum) {
-        setTimeout(async () => {
-          try {
-            const web3Provider = new BrowserProvider(window.ethereum!);
-            const s = await web3Provider.getSigner();
-            setProvider(web3Provider);
-            setSigner(s);
-            console.log('✅ Provider 已更新');
-          } catch (err) {
-            console.error('❌ 更新 provider 失败:', err);
-          }
-        }, 100);
-      }
-    }
-    
     // 直接注册到 window.ethereum
     console.log('📌 注册监听器...');
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
     console.log('✅ 监听器注册完成！');
-    
+    // @ts-ignore
+    window.ethereum.request({ method: "eth_accounts" }).then((accounts: string[]) => {
+      if (accounts.length > 0) setAccount(accounts[0]);
+    });
     // 验证注册（类型断言）
     console.log('🔍 验证: window.ethereum._events =', (window.ethereum as { _events?: unknown })._events);
     
@@ -317,7 +320,7 @@ export default function AbiDynamicUI() {
         window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
     };
-  }, []);
+  }, [handleAccountsChanged, handleChainChanged]); // 依赖于 useCallback 包裹的处理器
 
   // 重新连接钱包（页面刷新后恢复）
   async function reconnectWallet() {
