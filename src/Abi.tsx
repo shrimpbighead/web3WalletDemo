@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { BrowserProvider, Contract, type Signer } from "ethers";
 import toast, { Toaster } from "react-hot-toast";
-// 单文件 React 组件 (TypeScript)
-// 功能：
-// 1) 连接 MetaMask
-// 2) 使用钱包对随机字符串签名
-// 3) 切换链（支持通过链 id 切换到常见以太兼容链）
-// 4) 输入 ABI JSON 和合约地址
-// 5) 根据 ABI 生成界面（仅支持基本类型：address, uint*, int*, bool, string, bytes）
-// 6) 调用合约方法并展示结果（view/pure 直接 call，非 view 发起交易并展示 txHash）
+// Single-file React Component (TypeScript)
+// Features:
+// 1) Connect to MetaMask
+// 2) Sign random strings with wallet
+// 3) Switch chains (supports switching to common EVM-compatible chains)
+// 4) Input ABI JSON and contract address
+// 5) Generate UI from ABI (supports basic types: address, uint*, int*, bool, string, bytes)
+// 6) Call contract methods and display results (view/pure -> call, non-view -> send transaction)
 
-// 使用说明：
-// - 需要安装依赖：ethers v6
-// - 推荐在已有 React + Tailwind 项目中使用
-// - 只作为演示/骨架，可按需扩展（类型校验、数组、struct 等）
+// Usage:
+// - Requires: ethers v6
+// - Recommended for React + Tailwind projects
+// - Demo/skeleton only, can be extended (type validation, arrays, structs, etc.)
 
 type AbiInput = { 
   name: string; 
@@ -164,65 +164,65 @@ const CHAIN_MAP: { [k: string]: ChainConfig } = {
 };
 
 export default function AbiDynamicUI() {
-  // provider 和 signer 用于维护连接状态，在 callFunction 中会实时获取最新值
+  // Provider and signer maintain connection state, will be fetched real-time in callFunction
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [signer, setSigner] = useState<Signer | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<string | null>(null);
 
-  // 用于调试：记录连接状态
-  console.log('🔍 当前连接状态:', { hasProvider: !!provider, hasSigner: !!signer, account, chainId });
+  // Debug: log connection state
+  console.log('🔍 Current connection state:', { hasProvider: !!provider, hasSigner: !!signer, account, chainId });
 
   const [abiText, setAbiText] = useState<string>("[]");
   const [contractAddress, setContractAddress] = useState<string>("");
   const [abi, setAbi] = useState<AbiItem[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
 
-  // 每个函数调用的参数状态， key: functionName#idx 或 functionSignature
+  // Parameter state for each function call, key: functionName#idx or functionSignature
   const [paramsState, setParamsState] = useState<Record<string, string>>({});
 
   const [logs, setLogs] = useState<string[]>([]);
   
-  // 防止重复自动重连
+  // Prevent duplicate auto-reconnection
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // 页面加载时从 localStorage 恢复钱包连接
+  // Restore wallet connection from localStorage on page load
   useEffect(() => {
     const savedAccount = localStorage.getItem('wallet_account');
     
     if (savedAccount && window.ethereum) {
-      console.log('💾 检测到保存的账号，准备验证并恢复...');
+      console.log('💾 Detected saved account, preparing to verify and restore...');
       
-      // 等待一小段时间让 MetaMask 初始化，然后立即验证
+      // Wait a moment for MetaMask to initialize, then verify
       const timer = setTimeout(() => {
         reconnectWallet().catch((error) => {
-          console.error('❌ 自动重连失败:', error);
-          // 验证失败，清除保存的状态
+          console.error('❌ Auto-reconnect failed:', error);
+          // Verification failed, clear saved state
           localStorage.removeItem('wallet_account');
           localStorage.removeItem('wallet_chainId');
-          // 不显示 toast，静默失败
-          console.log('⚠️ 请手动重新连接钱包');
+          // Don't show toast, fail silently
+          console.log('⚠️ Please manually reconnect wallet');
         });
-      }, 800); // 800ms 是个平衡点：既给 MetaMask 初始化时间，又不让用户等太久
+      }, 800); // 800ms is a balance: gives MetaMask time to init without making user wait too long
       
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 账户切换处理器 - 使用 useCallback 避免闭包问题
+  // Account change handler - use useCallback to avoid closure issues
   const handleAccountsChanged = useCallback((...args: unknown[]) => {
     const accounts = args[0] as string[];
-    console.log('🔔🔔🔔 accountsChanged 触发！！！', accounts);
-    console.log('账户数量:', accounts.length);
-    console.log('第一个账户:', accounts[0]);
+    console.log('🔔🔔🔔 accountsChanged triggered!!!', accounts);
+    console.log('Account count:', accounts.length);
+    console.log('First account:', accounts[0]);
     
     const newAccount = accounts[0] ?? null;
     
     if (newAccount) {
-      console.log('🔄 开始处理账户切换到:', newAccount);
+      console.log('🔄 Starting account switch to:', newAccount);
       
-      // 异步处理
+      // Async processing
       setTimeout(async () => {
         try {
           if (!window.ethereum) return;
@@ -231,7 +231,7 @@ export default function AbiDynamicUI() {
           const s = await web3Provider.getSigner();
           const addr = await s.getAddress();
           
-          console.log('✅ 新 signer 地址:', addr);
+          console.log('✅ New signer address:', addr);
           
           setProvider(web3Provider);
           setSigner(s);
@@ -244,36 +244,36 @@ export default function AbiDynamicUI() {
           localStorage.setItem('wallet_account', addr);
           localStorage.setItem('wallet_chainId', hexChainId);
           
-          toast.success(`已切换到 ${addr.slice(0, 6)}...${addr.slice(-4)}`, {
+          toast.success(`Switched to ${addr.slice(0, 6)}...${addr.slice(-4)}`, {
             icon: '🔄',
             duration: 3000
           });
-          console.log('✅ 账户切换完成！');
+          console.log('✅ Account switch completed!');
         } catch (error) {
-          console.error('❌ 账户切换失败:', error);
-          toast.error('账户切换失败');
+          console.error('❌ Account switch failed:', error);
+          toast.error('Account switch failed');
         }
       }, 100);
     } else {
-      console.log('⚠️ 账户断开');
+      console.log('⚠️ Account disconnected');
       setProvider(null);
       setSigner(null);
       setAccount(null);
       setChainId(null);
       localStorage.clear();
-      toast.error('账户已断开');
+      toast.error('Account disconnected');
     }
-  }, []); // 空依赖数组，因为所有的 setState 函数都是稳定的
+  }, []); // Empty dependency array, all setState functions are stable
   
-  // 链切换处理器 - 使用 useCallback 避免闭包问题
+  // Chain change handler - use useCallback to avoid closure issues
   const handleChainChanged = useCallback((...args: unknown[]) => {
     const chainId = args[0] as string;
-    console.log('🔔 chainChanged 触发！chainId:', chainId);
+    console.log('🔔 chainChanged triggered! chainId:', chainId);
     setChainId(chainId);
     localStorage.setItem('wallet_chainId', chainId);
-    toast.success(`已切换到链 ${chainId}`, { duration: 2000 });
+    toast.success(`Switched to chain ${chainId}`, { duration: 2000 });
     
-    // 重新获取 signer
+    // Re-fetch signer
     if (window.ethereum) {
       setTimeout(async () => {
         try {
@@ -281,95 +281,94 @@ export default function AbiDynamicUI() {
           const s = await web3Provider.getSigner();
           setProvider(web3Provider);
           setSigner(s);
-          console.log('✅ Provider 已更新');
+          console.log('✅ Provider updated');
         } catch (err) {
-          console.error('❌ 更新 provider 失败:', err);
+          console.error('❌ Provider update failed:', err);
         }
       }, 100);
     }
-  }, []); // 空依赖数组，因为所有的 setState 函数都是稳定的
+  }, []); // Empty dependency array, all setState functions are stable
 
-  // 初始化 window.ethereum 事件监听器 - 使用持久化策略
+  // Initialize window.ethereum event listeners - use persistence strategy
   useEffect(() => {
-    console.log('🎯 [新版] 正在注册 MetaMask 事件监听器...');
+    console.log('🎯 [New Version] Registering MetaMask event listeners...');
     
     let handlers: { accountsHandler: (...args: unknown[]) => void; chainHandler: (...args: unknown[]) => void } | null = null;
     let checkInterval: NodeJS.Timeout | null = null;
     
-    // 使用箭头函数包装，避免闭包问题
+    // Use arrow function wrapper to avoid closure issues
     const accountsHandler = (...args: unknown[]) => {
-      console.log('🔔🔔🔔 accountsChanged 触发！！！', args);
+      console.log('🔔🔔🔔 accountsChanged triggered!!!', args);
       handleAccountsChanged(...args);
     };
     
     const chainHandler = (...args: unknown[]) => {
-      console.log('🔔 chainChanged 触发！chainId:', args);
+      console.log('🔔 chainChanged triggered! chainId:', args);
       handleChainChanged(...args);
     };
     
-    // 注册监听器的函数
+    // Function to register listeners
     const registerListeners = () => {
       if (!window.ethereum) {
-        console.log('❌ window.ethereum 不存在');
+        console.log('❌ window.ethereum does not exist');
         return false;
       }
       
-      // 检查是否已经注册（避免重复注册）
+      // Check if already registered (avoid duplicate registration)
       const events = (window.ethereum as { _events?: Record<string, unknown[]> })._events;
-      // @ts-ignore
+      // @ts-expect-error - accessing internal MetaMask events
       const hasAccountsListener = events?.accountsChanged?.length > 0;
       
       if (hasAccountsListener) {
-        console.log('✓ 监听器已存在，跳过注册');
+        console.log('✓ Listener already exists, skip registration');
         return true;
       }
       
-      console.log('📌 注册监听器...');
+      console.log('📌 Registering listeners...');
       window.ethereum.on('accountsChanged', accountsHandler);
       window.ethereum.on('chainChanged', chainHandler);
-      console.log('✅ 监听器注册完成！');
+      console.log('✅ Listener registration completed!');
       
-      // 验证注册
+      // Verify registration
       const newEvents = (window.ethereum as { _events?: unknown })._events;
-      console.log('🔍 验证: window.ethereum._events =', newEvents);
+      console.log('🔍 Verify: window.ethereum._events =', newEvents);
       
       return true;
     };
     
-    // 初始注册
+    // Initial registration
     const timer = setTimeout(() => {
       if (registerListeners()) {
         handlers = { accountsHandler, chainHandler };
         
-        // 每 2 秒检查一次监听器是否还在
+        // Check every 5 seconds if listeners are still there
         checkInterval = setInterval(() => {
           if (!window.ethereum) return;
           
           const events = (window.ethereum as { _events?: Record<string, unknown[]> })._events;
-          // @ts-ignore
-          const hasListeners = typeof events?.accountsChanged === 'function';
+          const hasListeners = events && typeof events.accountsChanged !== 'undefined';
           
           if (!hasListeners) {
-            console.warn('⚠️ 检测到监听器丢失，重新注册...');
+            console.warn('⚠️ Detected listener loss, re-registering...');
             registerListeners();
           }
         }, 5000);
       }
       
-      // 初始获取账户
+      // Initial account fetch
       if (window.ethereum) {
         window.ethereum.request({ method: "eth_accounts" })
-        // @ts-ignore
+        // @ts-expect-error - eth_accounts returns string[]
         .then((accounts: string[]) => {
             if (accounts.length > 0) setAccount(accounts[0]);
           })
-          .catch(err => console.error('获取账户失败:', err));
+          .catch(err => console.error('Failed to fetch accounts:', err));
       }
     }, 100);
     
-    // 清理函数
+    // Cleanup function
     return () => {
-      console.log('🧹 清理监听器和定时器');
+      console.log('🧹 Cleaning up listeners and timers');
       clearTimeout(timer);
       if (checkInterval) clearInterval(checkInterval);
       
@@ -378,90 +377,91 @@ export default function AbiDynamicUI() {
         window.ethereum.removeListener('chainChanged', handlers.chainHandler);
       }
     };
-  }, []); // 空依赖数组，只在挂载时执行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array, only execute on mount
 
-  // 重新连接钱包（页面刷新后恢复）
+  // Reconnect wallet (restore after page refresh)
   async function reconnectWallet() {
     if (isReconnecting) {
-      console.log('⏸️ 已有重连任务在进行中，跳过');
+      console.log('⏸️ Reconnection task already in progress, skip');
       return;
     }
     
     setIsReconnecting(true);
     
     try {
-      console.log('🔄 开始自动重连钱包...');
+      console.log('🔄 Starting automatic wallet reconnection...');
       
       if (!window.ethereum) {
-        console.log('❌ 未检测到 MetaMask');
+        console.log('❌ MetaMask not detected');
         return;
       }
       
       const web3Provider = new BrowserProvider(window.ethereum);
-      console.log('✅ BrowserProvider 创建成功');
+      console.log('✅ BrowserProvider created successfully');
       
-      // 添加超时机制，防止请求挂起
+      // Add timeout mechanism to prevent request hang
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('获取账号超时')), 10000);
+        setTimeout(() => reject(new Error('Account fetch timeout')), 10000);
       });
       
-      // 获取已连接的账号列表（不会弹窗）
-      console.log('⏳ 正在获取账号列表...');
+      // Get connected account list (no popup)
+      console.log('⏳ Fetching account list...');
       const accounts = await Promise.race([
         web3Provider.send("eth_accounts", []) as Promise<string[]>,
         timeoutPromise
       ]);
-      console.log('📋 获取到的账号列表:', accounts);
+      console.log('📋 Account list retrieved:', accounts);
       
       if (!accounts || accounts.length === 0) {
-        console.log('⚠️ 没有已连接的账号');
+        console.log('⚠️ No connected accounts');
         return;
       }
       
-      console.log('🔑 开始获取 signer...');
+      console.log('🔑 Getting signer...');
       const s = await web3Provider.getSigner();
       const addr = await s.getAddress();
-      console.log('✅ Signer 获取成功，地址:', addr);
+      console.log('✅ Signer retrieved successfully, address:', addr);
       
-      console.log('🌐 获取网络信息...');
+      console.log('🌐 Getting network info...');
       const network = await web3Provider.getNetwork();
       const hexChainId = `0x${network.chainId.toString(16)}`;
-      console.log('✅ 网络信息获取成功，链 ID:', hexChainId);
+      console.log('✅ Network info retrieved successfully, chain ID:', hexChainId);
       
-      // 更新状态
+      // Update state
       setProvider(web3Provider);
       setSigner(s);
       setAccount(addr);
       setChainId(hexChainId);
       
-      // 更新 localStorage
+      // Update localStorage
       localStorage.setItem('wallet_account', addr);
       localStorage.setItem('wallet_chainId', hexChainId);
       
-      // 显示成功的 toast
-      pushLog(`自动恢复连接成功：${addr}`);
-      toast.success('已自动恢复钱包连接', { icon: '🦊', duration: 2000 });
-      console.log('🎉 自动重连成功！');
+      // Show success toast
+      pushLog(`Auto-restore connection successful: ${addr}`);
+      toast.success('Wallet connection auto-restored', { icon: '🦊', duration: 2000 });
+      console.log('🎉 Auto-reconnect successful!');
     } catch (error) {
-      console.error('❌ 自动重连过程中出错:', error);
+      console.error('❌ Error during auto-reconnect:', error);
       throw error;
     } finally {
       setIsReconnecting(false);
-      console.log('🔓 重连状态已重置');
+      console.log('🔓 Reconnect state reset');
     }
   }
 
-  // 连接 MetaMask
+  // Connect to MetaMask
   async function connectWallet() {
-    const toastId = toast.loading('正在连接钱包...');
+    const toastId = toast.loading('Connecting wallet...');
     try {
       if (!window.ethereum) {
-        throw new Error("未检测到 MetaMask 或兼容钱包");
+        throw new Error("MetaMask or compatible wallet not detected");
       }
       const web3Provider = new BrowserProvider(window.ethereum);
       const accounts = await web3Provider.send("eth_requestAccounts", []);
       await window.ethereum.request({ method: "eth_accounts"});
-      console.log('📋 获取到的账号列表:', accounts);
+      console.log('📋 Account list retrieved:', accounts);
       const s = await web3Provider.getSigner();
       const addr = await s.getAddress();
       setProvider(web3Provider);
@@ -471,23 +471,23 @@ export default function AbiDynamicUI() {
       const hexChainId = `0x${network.chainId.toString(16)}`;
       setChainId(hexChainId);
       
-      // 保存到 localStorage
+      // Save to localStorage
       localStorage.setItem('wallet_account', addr);
       localStorage.setItem('wallet_chainId', hexChainId);
       
-      pushLog(`已连接：${addr}`);
-      toast.success(`成功连接钱包`, { id: toastId, icon: '✅' });
+      pushLog(`Connected: ${addr}`);
+      toast.success(`Wallet connected successfully`, { id: toastId, icon: '✅' });
     } catch (e) {
       const error = e as Error;
-      pushLog(`连接失败: ${error.message || String(e)}`);
-      toast.error(`连接失败: ${error.message}`, { id: toastId });
+      pushLog(`Connection failed: ${error.message || String(e)}`);
+      toast.error(`Connection failed: ${error.message}`, { id: toastId });
     }
   }
 
-  // 断开（只是本地状态清理）
+  // Disconnect (local state cleanup only)
   function disconnect() {
-    // 确认对话框
-    const confirmed = window.confirm('确定要断开钱包连接吗？');
+    // Confirmation dialog
+    const confirmed = window.confirm('Are you sure you want to disconnect the wallet?');
     if (!confirmed) {
       return;
     }
@@ -497,53 +497,53 @@ export default function AbiDynamicUI() {
     setAccount(null);
     setChainId(null);
     
-    // 清除 localStorage
+    // Clear localStorage
     localStorage.removeItem('wallet_account');
     localStorage.removeItem('wallet_chainId');
     
-    pushLog("已断开本地连接");
-    toast.success('已断开钱包连接', { icon: '👋' });
+    pushLog("Local connection disconnected");
+    toast.success('Wallet disconnected', { icon: '👋' });
   }
 
   
 
-  // 随机字符串并签名
+  // Sign random string
   async function signRandom() {
-    const toastId = toast.loading('正在请求签名...');
+    const toastId = toast.loading('Requesting signature...');
     try {
-      if (!signer) throw new Error("请先连接钱包");
+      if (!signer) throw new Error("Please connect wallet first");
       const random = Math.random().toString(36).slice(2) + Date.now().toString(36);
       const sig = await signer.signMessage(random);
-      pushLog(`随机字符串: ${random}`);
-      pushLog(`签名: ${sig}`);
-      toast.success('签名成功！', { id: toastId, icon: '✍️' });
+      pushLog(`Random string: ${random}`);
+      pushLog(`Signature: ${sig}`);
+      toast.success('Signature successful!', { id: toastId, icon: '✍️' });
     } catch (e) {
       const error = e as Error;
-      pushLog(`签名失败: ${error.message || String(e)}`);
-      toast.error(`签名失败: ${error.message}`, { id: toastId });
+      pushLog(`Signature failed: ${error.message || String(e)}`);
+      toast.error(`Signature failed: ${error.message}`, { id: toastId });
     }
   }
 
-  // 切换链
+  // Switch chain
   async function switchChain(target: ChainConfig) {
-    const toastId = toast.loading(`正在切换到 ${target.name}...`);
+    const toastId = toast.loading(`Switching to ${target.name}...`);
     try {
-      if (!window.ethereum) throw new Error("未检测到钱包");
+      if (!window.ethereum) throw new Error("Wallet not detected");
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: target.chainId }],
       });
-      pushLog(`已请求切换到 ${target.name} (${target.chainId})`);
-      toast.success(`成功切换到 ${target.name}`, { id: toastId, icon: '🔗' });
+      pushLog(`Requested switch to ${target.name} (${target.chainId})`);
+      toast.success(`Successfully switched to ${target.name}`, { id: toastId, icon: '🔗' });
     } catch (e: unknown) {
       const error = e as { code?: number; message?: string };
       
-      // 错误码 4902 表示该链未添加到 MetaMask
+      // Error code 4902 means the chain is not added to MetaMask
       if (error.code === 4902) {
         try {
-          toast.loading(`正在添加 ${target.name} 到钱包...`, { id: toastId });
+          toast.loading(`Adding ${target.name} to wallet...`, { id: toastId });
           
-          // 添加新网络
+          // Add new network
           await window.ethereum!.request({
             method: "wallet_addEthereumChain",
             params: [
@@ -557,33 +557,33 @@ export default function AbiDynamicUI() {
             ],
           });
           
-          pushLog(`已添加并切换到 ${target.name}`);
-          toast.success(`成功添加 ${target.name}！`, { id: toastId, icon: '✨' });
+          pushLog(`Added and switched to ${target.name}`);
+          toast.success(`Successfully added ${target.name}!`, { id: toastId, icon: '✨' });
         } catch (addError) {
           const err = addError as Error;
-          pushLog(`添加网络失败: ${err.message || String(addError)}`);
-          toast.error(`添加失败: ${err.message}`, { id: toastId });
+          pushLog(`Failed to add network: ${err.message || String(addError)}`);
+          toast.error(`Add failed: ${err.message}`, { id: toastId });
         }
       } else {
-        // 其他错误（用户拒绝等）
+        // Other errors (user rejected, etc.)
         const errMsg = error.message || String(e);
-        pushLog(`切换链失败: ${errMsg}`);
-        toast.error(`切换失败: ${errMsg}`, { id: toastId });
+        pushLog(`Chain switch failed: ${errMsg}`);
+        toast.error(`Switch failed: ${errMsg}`, { id: toastId });
       }
     }
   }
 
-  // 解析 ABI
+  // Parse ABI
   function tryParseAbi() {
-    const toastId = toast.loading('正在解析 ABI...');
+    const toastId = toast.loading('Parsing ABI...');
     try {
       const cleanText = abiText.replace(/,\s*([\]}])/g, '$1')
       const parsed = JSON.parse(cleanText);
-      if (!Array.isArray(parsed)) throw new Error("ABI 不是数组");
+      if (!Array.isArray(parsed)) throw new Error("ABI is not an array");
       setAbi(parsed as AbiItem[]);
       setParseError(null);
-      pushLog("ABI 解析成功");
-      toast.success(`解析成功！识别到 ${(parsed as AbiItem[]).filter(a => a.type === 'function').length} 个函数`, { 
+      pushLog("ABI parsed successfully");
+      toast.success(`Parsed successfully! Identified ${(parsed as AbiItem[]).filter(a => a.type === 'function').length} functions`, { 
         id: toastId, 
         icon: '📄',
         duration: 3000 
@@ -592,35 +592,35 @@ export default function AbiDynamicUI() {
       const error = e as Error;
       setParseError(error.message || String(e));
       setAbi([]);
-      pushLog(`ABI 解析失败: ${error.message || String(e)}`);
-      toast.error(`解析失败: ${error.message}`, { id: toastId });
+      pushLog(`ABI parsing failed: ${error.message || String(e)}`);
+      toast.error(`Parse failed: ${error.message}`, { id: toastId });
     }
   }
 
-  // 根据 abi 过滤出函数项
+  // Filter function items from abi
   const functions = useMemo(() => abi.filter((a) => a.type === "function"), [abi]);
 
-  // 根据函数与参数构造 key
+  // Construct key from function and parameters
   function getFnKey(fn: AbiItem) {
     const name = fn.name || "";
     const types = (fn.inputs || []).map((i) => i.type).join(",");
     return `${name}(${types})`;
   }
 
-  // 更新某个参数值
+  // Update a parameter value
   function updateParam(fnKey: string, idx: number, value: string) {
     const key = `${fnKey}#${idx}`;
     setParamsState((s) => ({ ...s, [key]: value }));
   }
 
-  // 从 paramsState 取值并尝试转换到合适类型
+  // Get value from paramsState and try to convert to appropriate type
   function parseParamValue(type: string, raw: string, paramName?: string): string | boolean {
-    // 这里只支持基本类型，数组/struct 未支持
+    // Only supports basic types, arrays/structs not supported
     if (type.startsWith("uint") || type.startsWith("int")) {
-      // 支持十进制数字输入
-      if (raw.trim() === "") throw new Error("空值");
+      // Support decimal number input
+      if (raw.trim() === "") throw new Error("Empty value");
       
-      // 检查是否是 amount/value 类型的参数，如果是则自动乘以 decimals
+      // Check if it's an amount/value type parameter, if so auto multiply by decimals
       const isAmountParam = paramName && (
         paramName.toLowerCase().includes('amount') ||
         paramName.toLowerCase().includes('value') ||
@@ -630,17 +630,17 @@ export default function AbiDynamicUI() {
       );
       
       if (isAmountParam) {
-        // 如果输入包含小数点，说明是人类可读格式，需要转换
+        // If input contains decimal point, it's human-readable format, needs conversion
         if (raw.includes('.') || (parseFloat(raw) < 1000000 && parseFloat(raw) > 0)) {
           const decimals = contractAddress.toLowerCase() === "0xdac17f958d2ee523a2206206994597c13d831ec7" ? 6 : 18;
           const numValue = parseFloat(raw);
           const bigIntValue = BigInt(Math.floor(numValue * Math.pow(10, decimals)));
-          console.log(`💰 ${paramName} 智能转换: ${raw} → ${bigIntValue.toString()} (decimals: ${decimals})`);
+          console.log(`💰 ${paramName} Smart conversion: ${raw} → ${bigIntValue.toString()} (decimals: ${decimals})`);
           return bigIntValue.toString();
         }
       }
       
-      // 使用 BigNumber 也可以，但 ethers 自动处理数字字符串
+      // Can also use BigNumber, but ethers auto-handles number strings
       return raw;
     }
     if (type === "address") {
@@ -651,26 +651,26 @@ export default function AbiDynamicUI() {
       return v === "true" || v === "1" || v === "yes";
     }
     if (type === "string") return raw;
-    if (type.startsWith("bytes")) return raw; // 用户需传 hex 或字符串
+    if (type.startsWith("bytes")) return raw; // User needs to pass hex or string
     // fallback
     return raw;
   }
 
-  // 执行函数（call 或 send）
+  // Execute function (call or send)
   async function callFunction(fn: AbiItem) {
     const isReadOnly = fn.stateMutability === "view" || fn.stateMutability === "pure";
-    const toastId = toast.loading(isReadOnly ? `正在查询 ${fn.name}...` : `正在发送交易 ${fn.name}...`);
+    const toastId = toast.loading(isReadOnly ? `Querying ${fn.name}...` : `Sending transaction ${fn.name}...`);
     
     try {
-      if (!window.ethereum) throw new Error("请先安装 MetaMask");
-      if (!account) throw new Error("请先连接钱包");
-      if (!contractAddress) throw new Error("请输入合约地址");
+      if (!window.ethereum) throw new Error("Please install MetaMask first");
+      if (!account) throw new Error("Please connect wallet first");
+      if (!contractAddress) throw new Error("Please enter contract address");
       
-      // 每次调用前重新获取最新的 provider 和 signer，确保使用当前网络
-      console.log('🔄 重新获取 provider 以确保使用当前网络...');
+      // Re-fetch latest provider and signer to ensure using current network
+      console.log('🔄 Refreshing provider to ensure current network...');
       const currentProvider = new BrowserProvider(window.ethereum);
       const currentSigner = await currentProvider.getSigner();
-      console.log('✅ Provider 已更新为当前网络');
+      console.log('✅ Provider updated to current network');
       
       const fnKey = getFnKey(fn);
       const inputs = fn.inputs || [];
@@ -687,27 +687,27 @@ export default function AbiDynamicUI() {
         const functionFragment = contract.getFunction(fn.name!);
         const res = await functionFragment(...args);
         const result = stringifyResult(res, fn.name);
-        pushLog(`函数 ${fn.name} 调用结果: ${result}`);
-        toast.success(`查询成功！结果: ${result.length > 50 ? result.slice(0, 50) + '...' : result}`, { 
+        pushLog(`Function ${fn.name} result: ${result}`);
+        toast.success(`Query success! Result: ${result.length > 50 ? result.slice(0, 50) + '...' : result}`, { 
           id: toastId, 
           icon: '📖',
           duration: 4000 
         });
       } else {
-        // 非 view -> 发送交易
+        // non-view -> send transaction
         const functionFragment = contract.getFunction(fn.name!);
         
-        toast.loading('等待用户确认交易...', { id: toastId });
+        toast.loading('Waiting for user confirmation...', { id: toastId });
         const txResp = await functionFragment(...args);
         
-        pushLog(`已发送交易 txHash: ${txResp.hash}`);
-        toast.loading(`交易已发送，等待确认... (${txResp.hash.slice(0, 10)}...)`, { id: toastId });
+        pushLog(`Transaction sent, txHash: ${txResp.hash}`);
+        toast.loading(`Transaction sent, waiting for confirmation... (${txResp.hash.slice(0, 10)}...)`, { id: toastId });
         
-        // 等待 1 个确认
+        // Wait for 1 confirmation
         const receipt = await txResp.wait(1);
-        pushLog(`交易确认: blockNumber=${receipt?.blockNumber}, status=${receipt?.status}`);
+        pushLog(`Transaction confirmed: blockNumber=${receipt?.blockNumber}, status=${receipt?.status}`);
         
-        toast.success(`交易成功！`, { 
+        toast.success(`Transaction successful!`, { 
           id: toastId, 
           icon: '🚀',
           duration: 5000 
@@ -715,21 +715,21 @@ export default function AbiDynamicUI() {
       }
     } catch (e) {
       const error = e as Error;
-      pushLog(`调用失败: ${error.message || String(e)}`);
+      pushLog(`Call failed: ${error.message || String(e)}`);
       
-      // 根据错误类型显示不同的提示
+      // Show different prompts based on error type
       if (error.message.includes('user rejected') || error.message.includes('User denied')) {
-        toast.error('用户取消了交易', { id: toastId, icon: '🚫' });
+        toast.error('User cancelled transaction', { id: toastId, icon: '🚫' });
       } else if (error.message.includes('insufficient funds')) {
-        toast.error('余额不足', { id: toastId, icon: '💸' });
+        toast.error('Insufficient funds', { id: toastId, icon: '💸' });
       } else if (error.message.includes('network changed') || error.message.includes('NETWORK_ERROR')) {
-        toast.error('网络已切换，请重新调用', { id: toastId, icon: '🔄' });
+        toast.error('Network changed, please retry', { id: toastId, icon: '🔄' });
       } else if (error.message.includes('wrong network') || error.message.includes('chain mismatch')) {
-        toast.error('合约不在当前网络，请切换网络', { id: toastId, icon: '⚠️' });
+        toast.error('Contract not on current network, please switch', { id: toastId, icon: '⚠️' });
       } else {
-        // 提取有用的错误信息
-        const errorMsg = error.message.split('\n')[0]; // 只取第一行
-        toast.error(`调用失败: ${errorMsg.length > 100 ? errorMsg.slice(0, 100) + '...' : errorMsg}`, { 
+        // Extract useful error info
+        const errorMsg = error.message.split('\n')[0]; // Only first line
+        toast.error(`Call failed: ${errorMsg.length > 100 ? errorMsg.slice(0, 100) + '...' : errorMsg}`, { 
           id: toastId,
           duration: 5000 
         });
@@ -740,48 +740,48 @@ export default function AbiDynamicUI() {
   function stringifyResult(res: unknown, functionName?: string): string {
     console.log('stringifyResult', res, functionName);
     try {
-      // 处理数组
+      // Handle arrays
       if (Array.isArray(res)) {
         return JSON.stringify(res.map((r) => stringifyResult(r, functionName)));
       }
       
-      // 根据合约地址判断 decimals
+      // Determine decimals based on contract address
       const getDecimals = () => {
-        // USDT 使用 6 位小数
+        // USDT uses 6 decimals
         if (contractAddress.toLowerCase() === "0xdac17f958d2ee523a2206206994597c13d831ec7") {
           return 6;
         }
-        // 其他 ERC20 代币默认使用 18 位
+        // Other ERC20 tokens default to 18 decimals
         return 18;
       };
       
-      // 处理 BigInt
+      // Handle BigInt
       if (typeof res === "bigint") {
         const rawValue = res.toString();
-        // 如果是余额相关函数，同时显示转换后的值
+        // If balance-related function, show converted value
         if (functionName && (
           functionName.toLowerCase().includes('balance') || 
           functionName.toLowerCase().includes('supply')
         )) {
           const decimals = getDecimals();
           const converted = Number(res) / Math.pow(10, decimals);
-          return `${converted.toLocaleString('en-US', { maximumFractionDigits: 6 })} (原始: ${rawValue})`;
+          return `${converted.toLocaleString('en-US', { maximumFractionDigits: 6 })} (raw: ${rawValue})`;
         }
         return rawValue;
       }
       
-      // 处理对象（包括 BigNumber）
+      // Handle objects (including BigNumber)
       if (res && typeof res === "object") {
         if ("_isBigNumber" in res || "toString" in res) {
           const rawValue = (res as { toString: () => string }).toString();
-          // 如果是余额相关函数，同时显示转换后的值
+          // If balance-related function, show converted value
           if (functionName && (
             functionName.toLowerCase().includes('balance') || 
             functionName.toLowerCase().includes('supply')
           )) {
             const decimals = getDecimals();
             const converted = Number(rawValue) / Math.pow(10, decimals);
-            return `${converted.toLocaleString('en-US', { maximumFractionDigits: 6 })} (原始: ${rawValue})`;
+            return `${converted.toLocaleString('en-US', { maximumFractionDigits: 6 })} (raw: ${rawValue})`;
           }
           return rawValue;
         }
@@ -838,7 +838,7 @@ export default function AbiDynamicUI() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
 
-        {/* 钱包连接区域 */}
+        {/* Wallet Connection Area */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 mb-8 border border-white/60">
           <div className="flex flex-wrap gap-3 items-center">
             <div className="flex-1 min-w-[200px]">
@@ -849,14 +849,14 @@ export default function AbiDynamicUI() {
                   disabled={!!account}
                 >
                   <span className="text-2xl">🦊</span>
-                  <span>{account ? "已连接" : "连接钱包"}</span>
+                  <span>{account ? "Connected" : "Connect Wallet"}</span>
                 </button>
                 {account && (
                   <button 
                     className="px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-all duration-200 hover:scale-105 transform" 
                     onClick={disconnect}
                   >
-                    断开
+                    Disconnect
                   </button>
                 )}
               </div>
@@ -868,30 +868,30 @@ export default function AbiDynamicUI() {
               disabled={!account}
             >
               <span className="text-xl">✍️</span>
-              <span>签名测试</span>
+              <span>Sign Test</span>
             </button>
 
             {account && (
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 px-6 py-3 rounded-xl border-2 border-indigo-200 shadow-md">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">已连接</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Connected</span>
                 </div>
                 <div className="text-sm font-mono font-bold text-indigo-900">
                   {account.slice(0, 6)}...{account.slice(-4)}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
-                  链 ID: <span className="font-semibold text-indigo-600">{chainId ?? "-"}</span>
+                  Chain ID: <span className="font-semibold text-indigo-600">{chainId ?? "-"}</span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* ABI 配置区域 */}
+        {/* ABI Configuration Area */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 md:p-8 mb-8 border border-gray-100">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* ABI 输入 */}
+            {/* ABI Input */}
             <div className="lg:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <label className="flex items-center gap-2 font-bold text-gray-800 text-xl">
@@ -899,7 +899,7 @@ export default function AbiDynamicUI() {
                   <span>ABI JSON</span>
                 </label>
                 <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
-                  必填
+                  Required
                 </span>
               </div>
               <textarea
@@ -907,7 +907,7 @@ export default function AbiDynamicUI() {
                 value={abiText}
                 onChange={(e) => setAbiText(e.target.value)}
                 className="w-full border-2 border-gray-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 p-4 rounded-xl font-mono text-sm transition-all duration-200 resize-none bg-gray-50 hover:bg-white shadow-inner"
-                placeholder='粘贴合约 ABI JSON 数组...'
+                placeholder='Paste contract ABI JSON array...'
               />
               <div className="flex flex-wrap gap-3 mt-4">
                 <button 
@@ -915,7 +915,7 @@ export default function AbiDynamicUI() {
                   onClick={tryParseAbi}
                 >
                   <span>🔍</span>
-                  <span>解析 ABI</span>
+                  <span>Parse ABI</span>
                 </button>
                 <button
                   className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-105 transform transition-all duration-300 flex items-center gap-2"
@@ -925,21 +925,21 @@ export default function AbiDynamicUI() {
                     setContractAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789");
                     switchChain(CHAIN_MAP.sepolia);
                     
-                    // 自动填充 balanceOf 参数
+                    // Auto-fill balanceOf parameter
                     setTimeout(() => {
                       setParamsState({
                         'balanceOf(address)#0': '0x4281eCF07378Ee595C564a59048801330f3084eE'
                       });
                     }, 100);
                     
-                    toast.success('已插入 LINK 合约示例并填充测试地址', { 
+                    toast.success('LINK contract example loaded with test address', { 
                       icon: '🔗',
                       duration: 3000 
                     });
                   }}
                 >
                   <span>🔗</span>
-                  <span>LINK 示例（Sepolia 测试网）</span>
+                  <span>LINK Example (Sepolia Testnet)</span>
                 </button>
               
                 
@@ -950,20 +950,20 @@ export default function AbiDynamicUI() {
                     setAbiText(JSON.stringify(usdtAbi, null, 2));
                     setContractAddress("0xdAC17F958D2ee523a2206206994597C13D831ec7");
                     switchChain(CHAIN_MAP.ethereum);
-                    // 自动填充 balanceOf 参数 - Vitalik 的地址
+                    // Auto-fill balanceOf parameter - Vitalik's address
                     setTimeout(() => {
                       setParamsState({
                         'balanceOf(address)#0': '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'
                       });
                     }, 100);
-                    toast.success('已插入 USDT 主网合约示例（Vitalik 地址）', { 
+                    toast.success('USDT mainnet contract example loaded (Vitalik address)', { 
                       icon: '💵',
                       duration: 3000 
                     });
                   }}
                 >
                   <span>💵</span>
-                  <span>USDT 示例 (主网)</span>
+                  <span>USDT Example (Mainnet)</span>
                 </button>
               </div>
               {parseError && (
@@ -971,7 +971,7 @@ export default function AbiDynamicUI() {
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">❌</span>
                     <div>
-                      <div className="font-bold mb-1">解析错误</div>
+                      <div className="font-bold mb-1">Parse Error</div>
                       <div className="text-red-700">{parseError}</div>
                     </div>
                   </div>
@@ -982,25 +982,25 @@ export default function AbiDynamicUI() {
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">✅</span>
                     <div className="flex-1">
-                      <div className="font-bold text-green-800">解析成功！</div>
-                      <div className="text-green-700 text-sm">已识别 <span className="font-bold text-lg">{functions.length}</span> 个函数</div>
+                      <div className="font-bold text-green-800">Parse Successful!</div>
+                      <div className="text-green-700 text-sm">Identified <span className="font-bold text-lg">{functions.length}</span> functions</div>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 右侧配置 */}
+            {/* Right Side Configuration */}
             <div className="space-y-6">
-              {/* 合约地址 */}
+              {/* Contract Address */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <label className="flex items-center gap-2 font-bold text-gray-800 text-xl">
                     <span className="text-2xl">📍</span>
-                    <span>合约地址</span>
+                    <span>Contract Address</span>
                   </label>
                   <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
-                    必填
+                    Required
                   </span>
                 </div>
                 <input
@@ -1011,30 +1011,30 @@ export default function AbiDynamicUI() {
                 />
                 {contractAddress === "0x779877A7B0D9E8603169DdbD7836e478b4624789" && (
                   <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-                    <div className="font-bold">💡 提示</div>
-                    <div>此为 LINK 测试币合约（<span className="font-bold">Sepolia 测试网</span>）</div>
+                    <div className="font-bold">💡 Info</div>
+                    <div>LINK test token contract (<span className="font-bold">Sepolia Testnet</span>)</div>
                   </div>
                 )}
                 {contractAddress === "0xdAC17F958D2ee523a2206206994597C13D831ec7" && (
                   <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
                     <div className="font-bold flex items-center gap-2">
                       <span>💡</span>
-                      <span>提示</span>
+                      <span>Info</span>
                     </div>
                     <div className="mt-1 space-y-1">
-                      <div>• 此为 USDT 稳定币合约（<span className="font-bold">Ethereum 主网</span>）</div>
-                      <div>• 查询地址为 <span className="font-bold">Vitalik Buterin</span> 的钱包</div>
-                      <div>• USDT decimals 为 <span className="font-bold">6</span>（系统已自动识别）</div>
+                      <div>• USDT stablecoin contract (<span className="font-bold">Ethereum Mainnet</span>)</div>
+                      <div>• Querying <span className="font-bold">Vitalik Buterin</span>'s wallet</div>
+                      <div>• USDT decimals: <span className="font-bold">6</span> (auto-detected)</div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 切换链 */}
+              {/* Switch Chain */}
               <div>
                 <label className="flex items-center gap-2 font-bold text-gray-800 text-xl mb-4">
                   <span className="text-2xl">🔗</span>
-                  <span>切换网络</span>
+                  <span>Switch Network</span>
                 </label>
                 <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto">
                   {Object.entries(CHAIN_MAP).map(([k, v]) => (
@@ -1053,14 +1053,14 @@ export default function AbiDynamicUI() {
           </div>
         </div>
 
-        {/* 函数调用区域 */}
+        {/* Function Call Area */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 md:p-8 mb-8 border border-gray-100">
           <div className="flex items-center gap-3 mb-6">
             <span className="text-4xl">⚡</span>
-            <h2 className="text-3xl font-black text-gray-800">智能合约函数</h2>
+            <h2 className="text-3xl font-black text-gray-800">Smart Contract Functions</h2>
             {functions.length > 0 && (
               <span className="ml-auto bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                {functions.length} 个函数
+                {functions.length} functions
               </span>
             )}
           </div>
@@ -1068,8 +1068,8 @@ export default function AbiDynamicUI() {
           {functions.length === 0 && (
             <div className="text-center py-20 bg-gradient-to-br from-gray-50 to-slate-100 rounded-2xl border-2 border-dashed border-gray-300">
               <div className="text-7xl mb-6 animate-bounce">📭</div>
-              <div className="text-xl font-bold text-gray-400 mb-2">暂无函数</div>
-              <div className="text-gray-500">请先解析 ABI 以生成函数调用界面</div>
+              <div className="text-xl font-bold text-gray-400 mb-2">No Functions</div>
+              <div className="text-gray-500">Please parse ABI first to generate function call interface</div>
             </div>
           )}
 
@@ -1088,7 +1088,7 @@ export default function AbiDynamicUI() {
                             ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white" 
                             : "bg-gradient-to-r from-orange-500 to-red-500 text-white"
                         }`}>
-                          {isReadOnly ? "🔍 只读" : "✍️ 写入"} · {fn.stateMutability ?? "nonpayable"}
+                          {isReadOnly ? "🔍 Read" : "✍️ Write"} · {fn.stateMutability ?? "nonpayable"}
                         </span>
                         {fn.outputs && fn.outputs.length > 0 && (
                           <span className="text-xs px-4 py-1.5 rounded-full font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
@@ -1105,7 +1105,7 @@ export default function AbiDynamicUI() {
                       }`}
                       onClick={() => callFunction(fn)}
                     >
-                      {isReadOnly ? "📖 调用查询" : "🚀 发送交易"}
+                      {isReadOnly ? "📖 Call Query" : "🚀 Send Transaction"}
                     </button>
                   </div>
 
@@ -1116,7 +1116,7 @@ export default function AbiDynamicUI() {
                         return (
                           <div key={key}>
                             <label className="block text-sm font-bold text-gray-800 mb-2">
-                              {inp.name || `参数 ${idx + 1}`}
+                              {inp.name || `Param ${idx + 1}`}
                               <span className="text-xs font-semibold text-indigo-600 ml-2 px-2 py-1 bg-indigo-100 rounded-md">
                                 {inp.type}
                               </span>
@@ -1138,15 +1138,15 @@ export default function AbiDynamicUI() {
           </div>
         </div>
 
-        {/* 日志输出区域 */}
+        {/* Log Output Area */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6 md:p-8 border border-gray-100">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <span className="text-4xl">📊</span>
-              <h2 className="text-3xl font-black text-gray-800">执行日志</h2>
+              <h2 className="text-3xl font-black text-gray-800">Execution Logs</h2>
               {logs.length > 0 && (
                 <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                  {logs.length} 条
+                  {logs.length} logs
                 </span>
               )}
             </div>
@@ -1156,7 +1156,7 @@ export default function AbiDynamicUI() {
               disabled={logs.length === 0}
             >
               <span>🗑️</span>
-              <span>清空日志</span>
+              <span>Clear Logs</span>
             </button>
           </div>
           <div className="relative">
@@ -1164,8 +1164,8 @@ export default function AbiDynamicUI() {
               {logs.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">
                   <div className="text-5xl mb-4">💻</div>
-                  <div className="text-lg font-bold">暂无日志记录</div>
-                  <div className="text-xs mt-2">执行函数后日志将显示在这里</div>
+                  <div className="text-lg font-bold">No Logs Yet</div>
+                  <div className="text-xs mt-2">Logs will appear here after executing functions</div>
                 </div>
               )}
               {logs.map((l, i) => (
@@ -1180,7 +1180,7 @@ export default function AbiDynamicUI() {
                 </div>
               ))}
             </div>
-            {/* 终端效果装饰 */}
+            {/* Terminal Decoration */}
             <div className="absolute top-0 left-0 right-0 h-8 bg-gray-800 rounded-t-2xl flex items-center px-4 gap-2 border-b-2 border-gray-700">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -1195,20 +1195,20 @@ export default function AbiDynamicUI() {
   );
 }
 
-// ---------- 辅助函数 ----------
+// ---------- Helper Functions ----------
 
 function placeholderForType(t: string) {
-  if (t.startsWith("uint") || t.startsWith("int")) return "例如: 123 或 1000000000000000000";
-  if (t === "address") return "例如: 0xabc...";
+  if (t.startsWith("uint") || t.startsWith("int")) return "e.g.: 123 or 1000000000000000000";
+  if (t === "address") return "e.g.: 0xabc...";
   if (t === "bool") return "true / false";
-  if (t === "string") return "任意文本";
-  if (t.startsWith("bytes")) return "十六进制或文本";
-  return "输入值";
+  if (t === "string") return "any text";
+  if (t.startsWith("bytes")) return "hex or text";
+  return "enter value";
 }
 
 function getUsdtMainnetAbi(): AbiItem[] {
-  // USDT (Tether) ERC20 合约 ABI 示例
-  // 合约地址 (Ethereum 主网): 0xdAC17F958D2ee523a2206206994597C13D831ec7
+  // USDT (Tether) ERC20 contract ABI example
+  // Contract address (Ethereum Mainnet): 0xdAC17F958D2ee523a2206206994597C13D831ec7
   // https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7?a=0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
   return [
     {
@@ -1291,9 +1291,9 @@ function getUsdtMainnetAbi(): AbiItem[] {
 }
 
 function getSampleAbi(): AbiItem[] {
-  // LINK 测试币 ERC20 合约 ABI 示例
-  // 合约地址 (Sepolia 测试网): 0x779877A7B0D9E8603169DdbD7836e478b4624789
-  // 这是 Chainlink 官方的 LINK 测试代币，可以免费从水龙头获取
+  // LINK test token ERC20 contract ABI example
+  // Contract address (Sepolia Testnet): 0x779877A7B0D9E8603169DdbD7836e478b4624789
+  // This is Chainlink official LINK test token, can be obtained free from faucet
   return [
     {
       "type": "function",
